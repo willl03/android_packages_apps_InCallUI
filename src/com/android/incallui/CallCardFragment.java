@@ -106,10 +106,6 @@ public class CallCardFragment extends BaseFragment<CallCardPresenter, CallCardPr
     // Container view that houses the primary call information
     private ViewGroup mPrimaryCallInfo;
     private View mCallButtonsContainer;
-    private ImageButton mVBButton;
-    private AudioManager mAudioManager;
-    private Toast mVBNotify;
-    private int mVBToastPosition;
     private TextView mRecordingTimeLabel;
     private TextView mRecordingIcon;
     private View mDetailedCallInfo;
@@ -147,11 +143,6 @@ public class CallCardFragment extends BaseFragment<CallCardPresenter, CallCardPr
 
     private String mRecordingTime;
 
-    private static final int TTY_MODE_OFF = 0;
-    private static final int TTY_MODE_HCO = 2;
-
-    private static final String VOLUME_BOOST = "volume_boost";
-
     private static final String RECORD_STATE_CHANGED =
             "com.qualcomm.qti.phonefeature.RECORD_STATE_CHANGED";
     private static final String PREFS_KEY_DETAILED_INFO = "detailed_incall_info";
@@ -183,12 +174,6 @@ public class CallCardFragment extends BaseFragment<CallCardPresenter, CallCardPr
                 R.dimen.end_call_floating_action_button_diameter);
         mFabSmallDiameter = getResources().getDimensionPixelOffset(
                 R.dimen.end_call_floating_action_button_small_diameter);
-
-        mVBToastPosition = Integer.parseInt(
-                getResources().getString(R.string.volume_boost_toast_position));
-
-        mAudioManager = (AudioManager) getActivity()
-                .getSystemService(Context.AUDIO_SERVICE);
 
         IntentFilter filter = new IntentFilter();
         filter.addAction(RECORD_STATE_CHANGED);
@@ -303,10 +288,6 @@ public class CallCardFragment extends BaseFragment<CallCardPresenter, CallCardPr
         mPrimaryName.setElegantTextHeight(false);
         mCallStateLabel.setElegantTextHeight(false);
 
-        mVBButton = (ImageButton) view.findViewById(R.id.volumeBoost);
-        if (null != mVBButton) {
-            mVBButton.setOnClickListener(mVBListener);
-        }
         mRecordingTimeLabel = (TextView) view.findViewById(R.id.recordingTime);
         mRecordingIcon = (TextView) view.findViewById(R.id.recordingIcon);
 
@@ -576,7 +557,6 @@ public class CallCardFragment extends BaseFragment<CallCardPresenter, CallCardPr
                 sessionModificationState, disconnectCause, connectionLabel,
                 isGatewayCall, isWaitingForRemoteSide);
 
-        updateVBbyCall(state);
         updateMoreMenuByCall(state);
 
         Log.v(this, "setCallState " + callStateLabel);
@@ -1113,81 +1093,6 @@ public class CallCardFragment extends BaseFragment<CallCardPresenter, CallCardPr
         }
     }
 
-    private OnClickListener mVBListener = new OnClickListener() {
-        @Override
-        public void onClick(View arg0) {
-            if (isVBAvailable()) {
-                switchVBStatus();
-            }
-
-            updateVBButton();
-            showVBNotify();
-        }
-    };
-
-    private boolean isVBAvailable() {
-        int mode = AudioModeProvider.getInstance().getAudioMode();
-        final Activity activity = getActivity();
-
-        int settingsTtyMode;
-
-        if (activity != null) {
-            settingsTtyMode = Settings.Secure.getInt(activity.getContentResolver(),
-                    Settings.Secure.PREFERRED_TTY_MODE, TTY_MODE_OFF);
-        } else {
-            settingsTtyMode = TTY_MODE_OFF;
-        }
-
-        return (mode == AudioState.ROUTE_EARPIECE || mode == AudioState.ROUTE_SPEAKER
-                || settingsTtyMode == TTY_MODE_HCO);
-    }
-
-    private void switchVBStatus() {
-        if (mAudioManager.getParameters(VOLUME_BOOST).contains("=on")) {
-            mAudioManager.setParameters(VOLUME_BOOST + "=off");
-        } else {
-            mAudioManager.setParameters(VOLUME_BOOST + "=on");
-        }
-    }
-
-    private void updateVBButton() {
-        if (isVBAvailable()
-                && mAudioManager.getParameters(VOLUME_BOOST).contains("=on")) {
-
-                mVBButton.setBackgroundResource(R.drawable.vb_active);
-        } else if (isVBAvailable()
-                && !(mAudioManager.getParameters(VOLUME_BOOST).contains("=on"))) {
-
-                mVBButton.setBackgroundResource(R.drawable.vb_normal);
-        } else {
-            mVBButton.setBackgroundResource(R.drawable.vb_disable);
-        }
-    }
-
-    private void showVBNotify() {
-        if (mVBNotify != null) {
-            mVBNotify.cancel();
-        }
-
-        if (isVBAvailable()
-                && mAudioManager.getParameters(VOLUME_BOOST).contains("=on")) {
-
-            mVBNotify = Toast.makeText(getView().getContext(),
-                    R.string.volume_boost_notify_enabled, Toast.LENGTH_SHORT);
-        } else if (isVBAvailable()
-                && !(mAudioManager.getParameters(VOLUME_BOOST).contains("=on"))) {
-
-            mVBNotify = Toast.makeText(getView().getContext(),
-                    R.string.volume_boost_notify_disabled, Toast.LENGTH_SHORT);
-        } else {
-            mVBNotify = Toast.makeText(getView().getContext(),
-                    R.string.volume_boost_notify_unavailable, Toast.LENGTH_SHORT);
-        }
-
-        mVBNotify.setGravity(Gravity.TOP, 0, mVBToastPosition);
-        mVBNotify.show();
-    }
-
     private void updateMoreMenuByCall(int state) {
         if (mMoreMenuButton == null) {
             return;
@@ -1221,36 +1126,6 @@ public class CallCardFragment extends BaseFragment<CallCardPresenter, CallCardPr
         } else {
             mMoreMenuButton.setVisibility(View.GONE);
         }
-    }
-
-    private void updateVBbyCall(int state) {
-        updateVBButton();
-
-        if (Call.State.ACTIVE == state) {
-            mVBButton.setVisibility(View.VISIBLE);
-        } else if (Call.State.DISCONNECTED == state) {
-            if (!CallList.getInstance().hasAnyLiveCall()
-                    && mAudioManager.getParameters(VOLUME_BOOST).contains("=on")) {
-                mVBButton.setVisibility(View.INVISIBLE);
-
-                mAudioManager.setParameters(VOLUME_BOOST + "=off");
-            }
-        }
-    }
-
-    public void updateVBbyAudioMode(int newMode) {
-        if (!(newMode == AudioState.ROUTE_EARPIECE
-                || newMode == AudioState.ROUTE_BLUETOOTH
-                || newMode == AudioState.ROUTE_WIRED_HEADSET
-                || newMode == AudioState.ROUTE_SPEAKER)) {
-            return;
-        }
-
-        if (mAudioManager != null && mAudioManager.getParameters(VOLUME_BOOST).contains("=on")) {
-            mAudioManager.setParameters(VOLUME_BOOST + "=off");
-        }
-
-        updateVBButton();
     }
 
     @Override
