@@ -348,8 +348,7 @@ public class CallCardFragment extends BaseFragment<CallCardPresenter, CallCardPr
             return;
         }
         if (visible) {
-            mVBButton.setVisibility(View.VISIBLE);
-            mVBButton.setBackgroundResource(on ? R.drawable.vb_active : R.drawable.vb_normal);
+            mVBButton.setVisibility(View.GONE);
         } else {
             mVBButton.setVisibility(View.GONE);
         }
